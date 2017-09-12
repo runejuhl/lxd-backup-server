@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -289,6 +290,7 @@ func (s BackupCommand) waitForOp(r Request, ch chan<- bool) (err error) {
 
 	// FIXME: set up a buffer for stdout
 	// stdout := bytes.NewBuffer()
+	stdout := new(MemoryBuffer)
 
 	// Run the associated command in the container copy
 	execReq := api.ContainerExecPost{
@@ -302,7 +304,7 @@ func (s BackupCommand) waitForOp(r Request, ch chan<- bool) (err error) {
 
 	execArgs := lxd.ContainerExecArgs{
 		Stdin:  stdin,
-		Stdout: os.Stdout,
+		Stdout: stdout,
 		// FIXME: Should we use a new io.ReadCloser here?
 		Stderr: os.Stderr,
 		// Since we're not interactive we don't need a handler
@@ -329,10 +331,80 @@ func (s BackupCommand) waitForOp(r Request, ch chan<- bool) (err error) {
 		return err
 	}
 
+	r.log.Debug("exec operation completed; waiting for buffers to be flushed")
+
 	// Wait for any remaining I/O to be flushed
 	<-execArgs.DataDone
 
-	r.log.Debug("exec operation finished")
+	r.log.WithFields(log.Fields{
+		"bufsize": stdout.Len(),
+	}).Debug("exec operation finished")
+
+	r.log.Debug("copying files")
+
+	files := strings.Split(stdout.String(), "\n")
+
+	for i, filename := range files {
+		if strings.TrimSpace(filename) == "" {
+			continue
+		}
+
+		source := fmt.Sprintf("%s%s", s.Name, filename)
+		destination := fmt.Sprintf("%s%s", s.destName,
+			path.Join(s.Destination, path.Base(filename)))
+
+		flog := r.log.WithFields(log.Fields{
+			"fileno":      i,
+			"filename":    filename,
+			"source":      source,
+			"destination": destination,
+		})
+
+		if filename[0] != '/' {
+			flog.Error("invalid filename")
+			continue
+		}
+
+		flog.Debug("copying...")
+
+		fc := FileCmd{}
+
+		args := []string{
+			source,
+			destination,
+		}
+
+		err = LXCPushFile(&fc, client.conf, true, args)
+		if err != nil {
+			flog.WithError(err).Error("copy failed")
+			continue
+		}
+
+		flog.Debug("copied")
+	}
+
+	r.log.Debug("stopping lxc")
+
+	stopReq := api.ContainerStatePut{
+		Action:   "stop",
+		Timeout:  2,
+		Force:    true,
+		Stateful: false,
+	}
+
+	stopOp, err := client.d.UpdateContainerState(s.destName, stopReq, "")
+	if err != nil {
+		r.Error(err, "failed to update lxc state")
+		return err
+	}
+
+	err = stopOp.Wait()
+	if err != nil {
+		r.Error(err, "stopping lxc failed")
+		return err
+	}
+
+	r.log.Debug("lxc stopped")
 
 	// And finally we signal a return
 	ch <- true
