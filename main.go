@@ -8,12 +8,11 @@ import (
 	"net/http"
 	"os"
 
-	logging "github.com/op/go-logging"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	name = "lxd-snapshot-server"
-	log  = logging.MustGetLogger(name)
 
 	c = InitClient()
 
@@ -36,12 +35,18 @@ const (
 	ErrServer
 )
 
-func main() {
-	startLogger()
+type Request struct {
+	w   http.ResponseWriter
+	r   *http.Request
+	log *log.Entry
+}
 
+func main() {
+
+	log.SetLevel(log.DebugLevel)
 	cts := c.GetContainers()
 
-	log.Debugf("%+v", cts["android"])
+	log.Debug(cts["android"])
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -55,18 +60,24 @@ func main() {
 
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) {
+func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 	reqID := genID()
 
-	w.Header().Set("Request-ID", reqID)
+	h := Request{
+		w:   hw,
+		r:   hr,
+		log: log.WithFields(log.Fields{"request_id": reqID}),
+	}
 
-	switch r.Method {
+	h.w.Header().Set("Request-ID", reqID)
+
+	switch h.r.Method {
 	case http.MethodPost:
-		routePost(w, r)
-		w.WriteHeader(http.StatusCreated)
+		routePost(h)
+		h.w.WriteHeader(http.StatusCreated)
 		return
 	default:
-		w.WriteHeader(http.StatusNotFound)
+		h.w.WriteHeader(http.StatusNotFound)
 		return
 	}
 }
@@ -89,16 +100,14 @@ func getBodyFromReq(w http.ResponseWriter, r io.ReadCloser) (bytes.Buffer, error
 }
 
 // Routing for POST requests
-func routePost(w http.ResponseWriter, r *http.Request) {
-	reqID := w.Header().Get("Request-ID")
-	log.Debugf("[%s] POST %s",
-		reqID,
-		r.URL.Path,
-	)
+func routePost(h Request) {
+	h.log.WithFields(log.Fields{
+		"url": h.r.URL.Path,
+	}).Debug()
 
-	switch r.URL.Path {
+	switch h.r.URL.Path {
 	case "/snapshot":
-		body, err := getBodyFromReq(w, r.Body)
+		body, err := getBodyFromReq(h.w, h.r.Body)
 
 		log.Debugf("%+v", body)
 		if err != nil {
@@ -106,7 +115,7 @@ func routePost(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		w.WriteHeader(http.StatusNotFound)
+		h.w.WriteHeader(http.StatusNotFound)
 		return
 	}
 }
