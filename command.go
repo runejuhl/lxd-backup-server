@@ -38,13 +38,13 @@ type BackupCommand struct {
 
 	srcCt api.Container
 
-	err      chan error
-	finished chan bool
+	err chan error
 }
 
 func (cmd BackupCommand) Error(err error, message string) {
 	cmd.log.WithError(err).Error(message)
 	cmd.err <- err
+	close(cmd.err)
 }
 
 func (cmd BackupCommand) Handle(req Request) {
@@ -289,7 +289,8 @@ func (cmd BackupCommand) process() {
 	}
 
 	cmd.log.Debug("lxc stopped")
-	cmd.finished <- true
+
+	close(cmd.err)
 
 	return
 }

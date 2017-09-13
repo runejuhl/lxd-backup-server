@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func genID() string {
@@ -60,6 +63,20 @@ func (ps PersistentOperations) Run() {
 
 }
 
+func (ps PersistentOperations) Delete(id string) {
+	cmd, ok := ps.cmds[id]
+
+	if !ok {
+		log.Error("tried to delete non-existant op")
+		return
+	}
+
+	delete(ps.cmds, id)
+
+	cmd.log.Debug("deleted")
+
+}
+
 func (ps PersistentOperations) Get(id string) (int, error) {
 	p, ok := ps.cmds[id]
 
@@ -68,27 +85,27 @@ func (ps PersistentOperations) Get(id string) (int, error) {
 	}
 
 	select {
-	case finished := <-p.finished:
-		if !finished {
+	case err, more := <-p.err:
+		if more && err == nil {
 			return http.StatusProcessing, nil
 		}
-		break
+
+		if !more && err == nil {
+			ps.Delete(id)
+			return http.StatusOK, nil
+		}
+
+		if err != nil {
+			ps.Delete(id)
+			return http.StatusGone, err
+		}
+
 	default:
 		return http.StatusProcessing, nil
 	}
 
-	delete(ps.cmds, id)
-
-	select {
-	case err := <-p.err:
-		if p.err != nil {
-			return http.StatusInternalServerError, err
-		}
-	default:
-		break
-	}
-
-	return http.StatusOK, nil
+	ps.Delete(id)
+	return http.StatusInternalServerError, errors.New("unknown error")
 }
 
 func (ps PersistentOperations) Keys() []string {
