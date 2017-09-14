@@ -30,8 +30,9 @@ type BackupCommand struct {
 	// backup
 	Command []string
 
-	id  string
-	log *log.Entry
+	id        string
+	timestamp time.Time
+	log       *log.Entry
 
 	srcCt api.Container
 
@@ -39,9 +40,33 @@ type BackupCommand struct {
 }
 
 func (cmd BackupCommand) Error(err error, message string) {
-	cmd.log.WithError(err).Error(message)
-	cmd.err <- err
-	close(cmd.err)
+	defer close(cmd.err)
+
+	if err != nil {
+		cmd.log.WithError(err).Error(message)
+		cmd.err <- err
+	}
+
+	stopReq := api.ContainerStatePut{
+		Action:   "stop",
+		Timeout:  2,
+		Force:    true,
+		Stateful: false,
+	}
+
+	stopOp, err := client.d.UpdateContainerState(cmd.destName, stopReq, "")
+	if err != nil {
+		cmd.log.WithError(err).Error("failed to update lxc state")
+		return
+	}
+
+	err = stopOp.Wait()
+	if err != nil {
+		cmd.log.WithError(err).Error("stopping lxc failed")
+		return
+	}
+
+	cmd.log.Debug("lxc stopped")
 }
 
 func (cmd BackupCommand) Handle(req Request) {
@@ -246,30 +271,7 @@ func (cmd BackupCommand) process() {
 		cmd.Error(err, "copy failed")
 	}
 
-	cmd.log.Debug("stopping lxc")
-
-	stopReq := api.ContainerStatePut{
-		Action:   "stop",
-		Timeout:  2,
-		Force:    true,
-		Stateful: false,
-	}
-
-	stopOp, err := client.d.UpdateContainerState(cmd.destName, stopReq, "")
-	if err != nil {
-		cmd.Error(err, "failed to update lxc state")
-		return
-	}
-
-	err = stopOp.Wait()
-	if err != nil {
-		cmd.Error(err, "stopping lxc failed")
-		return
-	}
-
-	cmd.log.Debug("lxc stopped")
-
-	close(cmd.err)
+	cmd.Error(nil, "")
 
 	return
 }

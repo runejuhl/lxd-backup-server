@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -118,6 +119,7 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 			}
 
 			cmd.id = req.ID
+			cmd.timestamp = time.Now()
 
 			cmd.Handle(req)
 			return

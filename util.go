@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -51,6 +52,7 @@ func NewPersistentOperations() *PersistentOperations {
 	}
 
 	go ps.Run()
+	go ps.Prune()
 	return &ps
 }
 
@@ -59,6 +61,23 @@ func (ps PersistentOperations) Run() {
 		cmd := <-ps.addCh
 		cmd.log.Debug("captured persistent operation")
 		ps.cmds[cmd.id] = cmd
+	}
+
+}
+
+func (ps PersistentOperations) Prune() {
+	for {
+		timeout := time.After(120 * time.Minute)
+		select {
+		case <-timeout:
+			for id, cmd := range ps.cmds {
+				since := time.Since(cmd.timestamp)
+				if since > (120 * time.Minute) {
+					cmd.log.Debug("deleting old cmd")
+					ps.Delete(id)
+				}
+			}
+		}
 	}
 
 }
@@ -96,8 +115,7 @@ func (ps PersistentOperations) Get(id string) (int, error) {
 		}
 
 		if err != nil {
-			ps.Delete(id)
-			return http.StatusGone, err
+			return http.StatusInternalServerError, err
 		}
 
 	default:
