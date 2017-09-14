@@ -39,11 +39,14 @@ type BackupCommand struct {
 }
 
 func (cmd BackupCommand) Error(err error, message string) {
-	defer close(cmd.err)
-
 	if err != nil {
 		cmd.log.WithError(err).Error(message)
-		cmd.err <- err
+
+		// Send a message from another thread so we don't block, even if we have to
+		// wait a long time for a listener
+		go func() {
+			cmd.err <- err
+		}()
 	}
 
 	stopReq := api.ContainerStatePut{
@@ -59,6 +62,7 @@ func (cmd BackupCommand) Error(err error, message string) {
 		return
 	}
 
+	cmd.log.Debug("stopping lxc")
 	err = stopOp.Wait()
 	if err != nil {
 		cmd.log.WithError(err).Error("stopping lxc failed")
@@ -271,6 +275,7 @@ func (cmd BackupCommand) process() {
 	err = LXCPullFile(cmd.log, &cmd.dstCt, cmd.destName, sources, fileDest)
 	if err != nil {
 		cmd.Error(err, "copy failed")
+		return
 	}
 
 	cmd.Error(nil, "")

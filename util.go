@@ -106,7 +106,7 @@ func (ps PersistentOperations) Get(id string) (int, error) {
 	select {
 	case err, more := <-cmd.err:
 		if more && err == nil {
-			return http.StatusProcessing, nil
+			return http.StatusLocked, nil
 		}
 
 		if !more && err == nil {
@@ -120,7 +120,7 @@ func (ps PersistentOperations) Get(id string) (int, error) {
 		}
 
 	default:
-		return http.StatusProcessing, nil
+		return http.StatusLocked, nil
 	}
 
 	ps.Delete(id)
