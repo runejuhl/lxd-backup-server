@@ -1,5 +1,57 @@
 * LXD backup server
 
+** Design
+This program implements a small HTTP server with the intention of providing a
+safe way to expose LXC commands to running containers.
+
+While LXD does have a REST API that can be used (and is indeed used here as
+well, though the Golang lxd library) it doesn't have any support for
+authentication or access control so any client able to connect can do anything
+to other containers.
+
+*** Endpoints
+
+**** POST =/backup=
+Start a backup job. Takes a JSON body like the following:
+
+#+BEGIN_SRC json
+  {
+    "name": "test",
+    "ephemeral": true,
+    "command": [
+      "bash",
+      "-c",
+      "sleep 10; echo /etc/debian_version"
+    ],
+    "profiles": [
+      "-default",
+      "default-nonic"
+    ]
+  }
+#+END_SRC
+
+This does the following when:
+
++ copies the LXC =name=
++ removes the =default= profile, adds the profile =default-nonic=
++ starts the copy
++ runs the specified command in the copy
++ copies the result (in this case =/etc/debian_version= in the copy) into
+  =FILE_DESTINATION=
++ stops the copy (and since it's ephemeral it also gets destroyed
+
+**** GET =/backup=
+Requires a header =Request-Id= with the request ID returning in the header from
+the job creation.
+
+Returns status of a backup job. As long as it's still running the result is a
+=423 Locked=. When it's done the resulting status is either =200 OK= or =500
+Internal Server Error= and the job is deleted.
+
+**** GET =/backup/list=
+Returns a JSON array of current backup jobs. Jobs are not necessarily still
+running, but their status hasn't been read yet.
+
 ** Running
 
 #+BEGIN_SRC bash
