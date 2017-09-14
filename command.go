@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -87,23 +86,9 @@ func (cmd BackupCommand) Handle(req Request) {
 
 	cmd.log.Debug()
 
-	opErr := persistedOperations.Add(&cmd)
+	persistedOperations.Add(cmd)
 
-	select {
-	case err := <-opErr:
-		if err != nil {
-			responseBody, _ := json.Marshal(HttpError{err})
-			req.w.Write(responseBody)
-			req.w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		break
-
-	case <-time.After(1e6 * time.Nanosecond):
-		req.w.WriteHeader(http.StatusAccepted)
-	}
-
+	req.w.WriteHeader(http.StatusAccepted)
 }
 
 func (cmd BackupCommand) process() {
