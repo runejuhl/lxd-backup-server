@@ -1,0 +1,12 @@
+Source: obmondo-lxd-backup-server
+Priority: optional
+Maintainer: Rune Juhl Jacobsen <runejuhl@enableit.dk>
+Section: misc
+Homepage: https://obmondo.com
+Build-Depends: debhelper (>= 9), devscripts (>= 2.16)
+Standards-Version: 3.9.8
+
+Package: obmondo-lxd-backup-server
+Architecture: all
+Depends: lxd (>= 2.0)
+Description: Backup server for safe backups of LXCs

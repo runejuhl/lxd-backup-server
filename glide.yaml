@@ -1,0 +1,11 @@
+package: .
+import:
+- package: github.com/lxc/lxd
+  subpackages:
+  - client
+  - lxc/config
+  - shared
+  - shared/api
+  - shared/version
+- package: github.com/sirupsen/logrus
+  version: v1.0.3

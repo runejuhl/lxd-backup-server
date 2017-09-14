@@ -1,0 +1,38 @@
+image: runejuhl/golang-build:latest
+
+variables:
+  GOPATH: '$CI_PROJECT_DIR/deps:$CI_PROJECT_DIR/tmp:/root/go'
+  GIT_SUBMODULE_STRATEGY: recursive
+
+cache:
+  paths:
+    # cache local vendor dir where dependency sources are stored
+    - '$CI_PROJECT_DIR/vendor'
+
+stages:
+  - build
+  - package
+
+before_script:
+  - glide install
+
+build:
+  stage: build
+  script:
+    - make
+
+package:
+  stage: package
+  only:
+    - tags
+    - triggers
+    - master
+  script:
+    # make sure we have the right modes on new files; docker seems to have a
+    # problem here and dpkg-build won't accept files that has bad permissions
+    - umask 0022
+    - make package
+  artifacts:
+    name: "${CI_PROJECT_NAME}-${CI_BUILD_TAG}"
+    paths:
+      - dist

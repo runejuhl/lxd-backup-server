@@ -1,0 +1,2 @@
+./lxd-backup-server /opt/obmondo/bin
+./lxd-backup-server.service /lib/systemd/system

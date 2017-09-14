@@ -1,0 +1,5 @@
+/dist/
+/tmp/
+
+/gin-bin
+/lxd-backup-server

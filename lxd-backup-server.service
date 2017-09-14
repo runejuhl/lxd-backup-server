@@ -1,0 +1,16 @@
+[Unit]
+Description=Packagesign Server
+After=network.target
+Before=network.target
+Wants=packagesign.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/packagesign-server
+ExecStart=/usr/bin/packagesign-server
+User=packagesign
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
