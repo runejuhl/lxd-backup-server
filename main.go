@@ -15,9 +15,9 @@ var (
 
 	client = InitClient()
 
-	urlMaxLength = int64(240)
-
 	persistedOperations = NewPersistentOperations()
+
+	fileDest string
 )
 
 // Exit codes
@@ -47,6 +47,11 @@ func main() {
 
 	log.SetLevel(log.DebugLevel)
 	// cts := client.GetContainers()
+
+	fileDest = os.Getenv("FILE_DESTINATION")
+	if fileDest == "" {
+		log.Fatal("No FILE_DESTINATION set; aborting")
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -113,6 +118,7 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 			}
 
 			cmd.id = req.ID
+
 			cmd.Handle(req)
 			return
 

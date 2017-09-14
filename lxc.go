@@ -2,23 +2,20 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	lxd "github.com/lxc/lxd/client"
 	"github.com/lxc/lxd/lxc/config"
 	"github.com/lxc/lxd/shared"
 	"github.com/lxc/lxd/shared/api"
-	"github.com/lxc/lxd/shared/i18n"
-	"github.com/lxc/lxd/shared/logger"
 	"github.com/lxc/lxd/shared/version"
 
-	log "github.com/sirupsen/logrus"
+	logrus "github.com/sirupsen/logrus"
 )
 
 type Client struct {
@@ -38,7 +35,7 @@ func loadConfig() *config.Config {
 	} else {
 		user, err := user.Current()
 		if err != nil {
-			log.WithError(err).
+			logrus.WithError(err).
 				Fatal("unable to get current user")
 		}
 
@@ -49,7 +46,7 @@ func loadConfig() *config.Config {
 	if shared.PathExists(configPath) {
 		conf, err = config.LoadConfig(configPath)
 		if err != nil {
-			log.WithError(err).Fatal("unable to load config")
+			logrus.WithError(err).Fatal("unable to load config")
 		}
 
 	} else {
@@ -71,7 +68,7 @@ func getServer(conf *config.Config) lxd.ContainerServer {
 
 	d, err := conf.GetContainerServer(remote)
 	if err != nil {
-		log.WithError(err).Fatal("unable to get server")
+		logrus.WithError(err).Fatal("unable to get server")
 	}
 
 	return d
@@ -90,7 +87,7 @@ func (c Client) GetContainers() map[string]api.Container {
 	containers, err := c.d.GetContainers()
 
 	if err != nil {
-		log.WithError(err).
+		logrus.WithError(err).
 			Fatal("error getting containers")
 	}
 
@@ -116,138 +113,87 @@ type FileCmd struct {
 
 // Adapted from
 // https://github.com/lxc/lxd/blob/b5678b80f32d2de619c88009a518bbdfca21d9d8/lxc/file.go
-func LXCPushFile(c *FileCmd, conf *config.Config, sendFilePerms bool, args []string) error {
-	if len(args) < 2 {
-		return errors.New("invalid number of args")
-	}
+func LXCPullFile(log *logrus.Entry, ct *api.Container, remote string, sources []string, target string) (err error) {
+	log = log.WithFields(logrus.Fields{
+		"remote": remote,
+		"target": target,
+	})
 
-	target := args[len(args)-1]
-	pathSpec := strings.SplitN(target, "/", 2)
-
-	if len(pathSpec) != 2 {
-		return fmt.Errorf(i18n.G("Invalid target %s"), target)
-	}
-
-	remote, container, err := conf.ParseRemote(pathSpec[0])
-	if err != nil {
+	if len(sources) == 0 || target == "" {
+		err := errors.New("invalid source or target")
+		log.Error(err)
 		return err
 	}
 
-	targetIsDir := strings.HasSuffix(target, "/")
-	// re-add leading / that got stripped by the SplitN
-	targetPath := "/" + pathSpec[1]
 	// clean various /./, /../, /////, etc. that users add (#2557)
-	targetPath = path.Clean(targetPath)
+	targetPath := path.Clean(target)
+	targetIsDir := strings.HasSuffix(targetPath, "/")
 
-	// normalization may reveal that path is still a dir, e.g. /.
-	if strings.HasSuffix(targetPath, "/") {
-		targetIsDir = true
+	if len(sources) > 1 && targetIsDir {
+		return errors.New("more than one source proviced, but target is not a dir")
 	}
 
-	logger.Debugf("Pushing to: %s  (isdir: %t)", targetPath, targetIsDir)
+	log.WithFields(logrus.Fields{
+		"targetPath":  targetPath,
+		"targetIsDir": targetIsDir,
+	}).Debug()
 
-	d, err := conf.GetContainerServer(remote)
-	if err != nil {
-		return err
-	}
-
-	var sourcefilenames []string
-	for _, fname := range args[:len(args)-1] {
-		if !strings.HasPrefix(fname, "--") {
-			sourcefilenames = append(sourcefilenames, fname)
-		}
-	}
-
-	mode := os.FileMode(0755)
-	if c.mode != "" {
-		if len(c.mode) == 3 {
-			c.mode = "0" + c.mode
-		}
-
-		m, err := strconv.ParseInt(c.mode, 0, 0)
-		if err != nil {
-			return err
-		}
-		mode = os.FileMode(m)
-	}
-
-	uid := 0
-	if c.uid >= 0 {
-		uid = c.uid
-	}
-
-	gid := 0
-	if c.gid >= 0 {
-		gid = c.gid
-	}
-
-	if (len(sourcefilenames) > 1) && !targetIsDir {
-		return errors.New("target is not a dir")
+	type CopyFile struct {
+		src     *os.File
+		dstResp *lxd.ContainerFileResponse
+		dstBuf  io.Reader
 	}
 
 	/* Make sure all of the files are accessible by us before trying to
 	 * push any of them. */
-	var files []*os.File
-	for _, f := range sourcefilenames {
-		var file *os.File
-		if f == "-" {
-			file = os.Stdin
-		} else {
-			file, err = os.Open(f)
-			if err != nil {
-				return err
-			}
+	files := make(map[string]CopyFile)
+	for _, filename := range sources {
+		if filename == "-" {
+			err := errors.New("can't use stdin as a source")
+			log.Error(err)
+			return err
 		}
 
-		defer file.Close()
-		files = append(files, file)
+		destFilename := path.Join(targetPath, path.Base(filename))
+
+		log = log.WithFields(logrus.Fields{
+			"filename":     filename,
+			"destFilename": destFilename,
+		})
+
+		buf, resp, err := client.d.GetContainerFile(remote, filename)
+		if err != nil {
+			log.WithError(err).Error("could not open file in src container")
+			return err
+		}
+
+		if resp.Type == "directory" {
+			return errors.New("source should not be a directory")
+		}
+
+		f, err := os.OpenFile(destFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY,
+			os.FileMode(resp.Mode))
+
+		if err != nil {
+			log.WithError(err).Error("could not open target file for exclusive writing")
+			return err
+		}
+
+		files[filename] = CopyFile{
+			src:     f,
+			dstResp: resp,
+			dstBuf:  buf,
+		}
 	}
 
-	for _, f := range files {
-		fpath := targetPath
-		if targetIsDir {
-			fpath = path.Join(fpath, path.Base(f.Name()))
-		}
+	for filename, cf := range files {
+		log.WithFields(logrus.Fields{
+			"filename": filename,
+		}).Debug("copying file")
 
-		args := lxd.ContainerFileArgs{
-			Content: f,
-			UID:     -1,
-			GID:     -1,
-			Mode:    -1,
-		}
-
-		if sendFilePerms {
-			if c.mode == "" || c.uid == -1 || c.gid == -1 {
-				finfo, err := f.Stat()
-				if err != nil {
-					return err
-				}
-
-				fMode, fUid, fGid := shared.GetOwnerMode(finfo)
-				if err != nil {
-					return err
-				}
-
-				if c.mode == "" {
-					mode = fMode
-				}
-
-				if c.uid == -1 {
-					uid = fUid
-				}
-
-				if c.gid == -1 {
-					gid = fGid
-				}
-			}
-
-			args.UID = int64(uid)
-			args.GID = int64(gid)
-			args.Mode = int(mode.Perm())
-		}
-
-		err = d.CreateContainerFile(container, fpath, args)
+		_, err = io.Copy(cf.src, cf.dstBuf)
 		if err != nil {
+			log.WithError(err).Error("could not copy file")
 			return err
 		}
 	}

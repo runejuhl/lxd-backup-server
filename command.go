@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -30,8 +29,6 @@ type BackupCommand struct {
 	// Command to run in LXC copy; should return a file path of the resulting
 	// backup
 	Command []string
-	// Where to copy the result to in the original LXC
-	Destination string
 
 	id  string
 	log *log.Entry
@@ -78,7 +75,7 @@ func (cmd BackupCommand) Handle(req Request) {
 
 		break
 
-	case <-time.After(1 * time.Second):
+	case <-time.After(1e6 * time.Nanosecond):
 		req.w.WriteHeader(http.StatusAccepted)
 	}
 
@@ -228,43 +225,25 @@ func (cmd BackupCommand) process() {
 
 	files := strings.Split(stdout.String(), "\n")
 
-	for i, filename := range files {
+	var sources []string
+	for _, filename := range files {
 		if strings.TrimSpace(filename) == "" {
 			continue
 		}
 
-		source := fmt.Sprintf("%s%s", cmd.Name, filename)
-		destination := fmt.Sprintf("%s%s", cmd.destName,
-			path.Join(cmd.Destination, path.Base(filename)))
-
-		flog := cmd.log.WithFields(log.Fields{
-			"fileno":      i,
-			"filename":    filename,
-			"source":      source,
-			"destination": destination,
-		})
-
 		if filename[0] != '/' {
-			flog.Error("invalid filename")
+			log.Error("invalid filename")
 			continue
 		}
 
-		flog.Debug("copying...")
+		sources = append(sources, filename)
+	}
 
-		fc := FileCmd{}
+	log.Debug("copying...")
 
-		args := []string{
-			source,
-			destination,
-		}
-
-		err = LXCPushFile(&fc, client.conf, true, args)
-		if err != nil {
-			flog.WithError(err).Error("copy failed")
-			continue
-		}
-
-		flog.Debug("copied")
+	err = LXCPullFile(cmd.log, &cmd.srcCt, cmd.destName, sources, fileDest)
+	if err != nil {
+		cmd.Error(err, "copy failed")
 	}
 
 	cmd.log.Debug("stopping lxc")

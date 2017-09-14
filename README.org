@@ -1,0 +1,15 @@
+* LXD backup server
+
+** Running
+
+#+BEGIN_SRC bash
+  FILE_DESTINATION=/var/lib/backups ./lxd-snapshot-server
+#+END_SRC
+
+** Example
+
+#+BEGIN_SRC bash
+  curl -i localhost:3000/backup -d '{"name": "test", "ephemeral": true, "command": ["bash", "-c", "sleep 10; echo /etc/debian_version"]}'
+  curl -i localhost:3000/backup/list
+  curl -i -H 'Request-Id: 679078d84ae43521' localhost:3000/backup
+#+END_SRC
