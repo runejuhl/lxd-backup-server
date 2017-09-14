@@ -34,7 +34,7 @@ type BackupCommand struct {
 	timestamp time.Time
 	log       *log.Entry
 
-	srcCt api.Container
+	dstCt api.Container
 
 	err chan error
 }
@@ -78,7 +78,7 @@ func (cmd BackupCommand) Handle(req Request) {
 		return
 	}
 
-	cmd.srcCt = ct
+	cmd.dstCt = ct
 	// Generate a unique and timestamped name for our copy
 	cmd.destName = fmt.Sprintf("%s-backup-%s", cmd.Name, cmd.id)
 	cmd.log = req.log.WithFields(log.Fields{
@@ -134,22 +134,22 @@ func (cmd BackupCommand) process() {
 	//	}
 	// }
 
-	cmd.srcCt.Ephemeral = cmd.Ephemeral
+	cmd.dstCt.Ephemeral = cmd.Ephemeral
 
 	// Strip any volatile keys. LXC uses volatile keys for things that should not
 	// be transferred when copying a container, e.g. MAC addresses
-	for k := range cmd.srcCt.Config {
+	for k := range cmd.dstCt.Config {
 		if k == "volatile.base_image" {
 			continue
 		}
 
 		if strings.HasPrefix(k, "volatile") {
-			delete(cmd.srcCt.Config, k)
+			delete(cmd.dstCt.Config, k)
 		}
 	}
 
 	// Do the actual copy
-	copyOp, err := client.d.CopyContainer(client.d, cmd.srcCt, &args)
+	copyOp, err := client.d.CopyContainer(client.d, cmd.dstCt, &args)
 	if err != nil {
 		cmd.log.WithError(err).Error("failed to send copy command")
 		return
@@ -266,7 +266,7 @@ func (cmd BackupCommand) process() {
 
 	log.Debug("copying...")
 
-	err = LXCPullFile(cmd.log, &cmd.srcCt, cmd.destName, sources, fileDest)
+	err = LXCPullFile(cmd.log, &cmd.dstCt, cmd.destName, sources, fileDest)
 	if err != nil {
 		cmd.Error(err, "copy failed")
 	}
