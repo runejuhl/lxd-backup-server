@@ -137,4 +137,39 @@ func (ps PersistentOperations) Keys() []string {
 
 type HttpError struct {
 	error
+
+// SimpleSet A set type for strings
+type SimpleSet struct {
+	set map[string]bool
 }
+
+// ToArray Convert a SimpleSet to []string
+func (ss *SimpleSet) ToArray() []string {
+	a := []string{}
+	for k := range ss.set {
+		a = append(a, k)
+	}
+
+	return a
+}
+
+// NewSimpleSet Create a new SimpleSet
+func NewSimpleSet() SimpleSet {
+	return SimpleSet{
+		set: make(map[string]bool),
+	}
+}
+
+// Add Add an item to a SimpleSet
+func (ss *SimpleSet) Add(s string) {
+	ss.set[s] = true
+}
+
+// Remove Remove an item from a SimpleSet
+func (ss *SimpleSet) Remove(s string) {
+	delete(ss.set, s)
+}
+
+// Flush Remove all items in a set
+func (ss *SimpleSet) Flush() {
+	ss.set = make(map[string]bool)

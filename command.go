@@ -68,7 +68,7 @@ func (cmd BackupCommand) Error(err error, message string) {
 	cmd.log.Debug("lxc stopped")
 }
 
-func (cmd BackupCommand) Handle(req Request) {
+func (cmd *BackupCommand) Handle(req Request) {
 	cts := client.GetContainers()
 	ct, ok := cts[cmd.Name]
 
@@ -107,11 +107,28 @@ func (cmd BackupCommand) process() {
 	// The following is copied almost verbatim from the lxc source code:
 	// https://github.com/lxc/lxd/blob/b5678b80f32d2de619c88009a518bbdfca21d9d8/lxc/copy.go
 
-	// Allow adding additional profiles
+	// Allow modifying profiles. If the profile name starts with a dash (`-`) we
+	// remove it; otherwise we add.
+
+	// I'm lazy and have enough resources to turn the profile array into a hash
+	// map so we get some prettier code. I would have used a set type, but
+	// apparently Go doesn't have those, so we'll make do with a new type and a
+	// bunch of assorted functions.
+	profiles := NewSimpleSet()
+
 	if cmd.Profiles != nil {
-		cmd.srcCt.Profiles = append(cmd.srcCt.Profiles, cmd.Profiles...)
+		for _, profile := range cmd.Profiles {
+			if profile == "-" {
+				profiles.Flush()
+			} else if profile[0] == '-' {
+				profiles.Remove(profile[1:])
+			} else {
+				profiles.Add(profile)
+			}
+		}
 	}
 
+	cmd.dstCt.Profiles = profiles.ToArray()
 	// // Allow setting additional config keys
 	// if cmd.Config != nil {
 	//	for key, value := range cmd.Config {
