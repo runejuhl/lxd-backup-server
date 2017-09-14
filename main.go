@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -74,13 +75,14 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 		w:  hw,
 		r:  hr,
 		log: log.WithFields(log.Fields{
-			"reqID": reqID,
-			"url":   hr.URL.Path,
+			"reqID":  reqID,
+			"url":    hr.URL.Path,
+			"method": hr.Method,
 		}),
 	}
 
 	req.w.Header().Set("Request-ID", req.ID)
-	req.log.Debug()
+	req.log.Info()
 
 	switch req.r.URL.Path {
 	case "/backup":
@@ -97,8 +99,8 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 			req.w.WriteHeader(status)
 
 			if err != nil {
-				responseBody, _ := json.Marshal(HttpError{err})
-				req.w.Write(responseBody)
+				req.log.WithError(err).Error()
+				req.w.Write([]byte(fmt.Sprintf("%s\n", err.Error())))
 			}
 
 			return
@@ -132,12 +134,11 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 		}
 
 		responseBody, _ := json.Marshal(persistedOperations.Keys())
-		req.w.Write(responseBody)
 		req.w.WriteHeader(http.StatusOK)
+		req.w.Write(responseBody)
 		return
 	}
 
-	req.log.Debug("not found!")
 	req.w.WriteHeader(http.StatusNotFound)
 	return
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/user"
@@ -163,19 +164,23 @@ func LXCPullFile(log *logrus.Entry, ct *api.Container, remote string, sources []
 
 		buf, resp, err := client.d.GetContainerFile(remote, filename)
 		if err != nil {
-			log.WithError(err).Error("could not open file in src container")
+			err = fmt.Errorf("could not open file in src container: %s", err)
+			log.WithError(err).Error()
 			return err
 		}
 
 		if resp.Type == "directory" {
-			return errors.New("source should not be a directory")
+			err = errors.New("source should not be a directory")
+			log.WithError(err).Error()
+			return err
 		}
 
 		f, err := os.OpenFile(destFilename, os.O_CREATE|os.O_EXCL|os.O_WRONLY,
 			os.FileMode(resp.Mode))
 
 		if err != nil {
-			log.WithError(err).Error("could not open target file for exclusive writing")
+			err = fmt.Errorf("could not open target file for exclusive writing: %s", err)
+			log.WithError(err).Error()
 			return err
 		}
 
@@ -193,7 +198,8 @@ func LXCPullFile(log *logrus.Entry, ct *api.Container, remote string, sources []
 
 		_, err = io.Copy(cf.src, cf.dstBuf)
 		if err != nil {
-			log.WithError(err).Error("could not copy file")
+			err = fmt.Errorf("could not copy fileL %s", err)
+			log.WithError(err).Error()
 			return err
 		}
 	}

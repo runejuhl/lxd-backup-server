@@ -92,29 +92,30 @@ func (ps PersistentOperations) Delete(id string) {
 
 	delete(ps.cmds, id)
 
-	cmd.log.Debug("deleted")
+	cmd.log.Debug("deleted persistent operation")
 
 }
 
 func (ps PersistentOperations) Get(id string) (int, error) {
-	p, ok := ps.cmds[id]
+	cmd, ok := ps.cmds[id]
 
 	if !ok {
 		return http.StatusNotFound, nil
 	}
 
 	select {
-	case err, more := <-p.err:
+	case err, more := <-cmd.err:
 		if more && err == nil {
 			return http.StatusProcessing, nil
 		}
 
 		if !more && err == nil {
-			ps.Delete(id)
+			defer ps.Delete(id)
 			return http.StatusOK, nil
 		}
 
 		if err != nil {
+			defer ps.Delete(id)
 			return http.StatusInternalServerError, err
 		}
 
@@ -134,9 +135,6 @@ func (ps PersistentOperations) Keys() []string {
 
 	return keys
 }
-
-type HttpError struct {
-	error
 
 // SimpleSet A set type for strings
 type SimpleSet struct {
@@ -173,3 +171,4 @@ func (ss *SimpleSet) Remove(s string) {
 // Flush Remove all items in a set
 func (ss *SimpleSet) Flush() {
 	ss.set = make(map[string]bool)
+}
