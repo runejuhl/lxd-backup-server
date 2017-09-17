@@ -28,6 +28,9 @@ type BackupCommand struct {
 	// Command to run in LXC copy; should return a file path of the resulting
 	// backup
 	Command []string
+	// Environment variables to use when running commands in the copy; setting
+	// `HOME` or `PATH` overrides the defaults
+	Environment map[string]string
 
 	id        string
 	timestamp time.Time
@@ -194,6 +197,14 @@ func (cmd BackupCommand) process() {
 	// 22f3d0e2e0df8fc882167d709d4d5f19438438f8; version 2.9 is the first tagged
 	// release to have this.
 	env := map[string]string{"HOME": "/root", "USER": "root"}
+
+	// When the above has been removed we can just use cmd.Environment instead of
+	// a new map.
+	if cmd.Environment != nil {
+		for k, v := range cmd.Environment {
+			env[k] = v
+		}
+	}
 
 	// FIXME: Do we need to do it this way, or can we simply pass nil?
 	var stdin io.ReadCloser
