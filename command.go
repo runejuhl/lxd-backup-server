@@ -200,8 +200,6 @@ func (cmd BackupCommand) process() {
 	stdin = os.Stdin
 	stdin = ioutil.NopCloser(bytes.NewReader(nil))
 
-	// FIXME: set up a buffer for stdout
-	// stdout := bytes.NewBuffer()
 	stdout := new(MemoryBuffer)
 
 	// Run the associated command in the container copy
