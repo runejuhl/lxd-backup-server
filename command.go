@@ -108,15 +108,8 @@ func (cmd *BackupCommand) Handle(req Request) {
 func (cmd BackupCommand) process() {
 	cmd.log.Debug()
 
-	args := lxd.ContainerCopyArgs{
-		Name: cmd.destName,
-		// Default value as of lxc 2.17 is "pull" -- we'll use that
-		Mode: "pull",
-		// Don't copy stateful; no need to dump memory
-		Live: false,
-		// We don't want to copy any snapshots, just the running instance
-		ContainerOnly: true,
-	}
+	args := client.GetContainerCopyArgs()
+	args.Name = cmd.destName
 
 	// The following is copied almost verbatim from the lxc source code:
 	// https://github.com/lxc/lxd/blob/b5678b80f32d2de619c88009a518bbdfca21d9d8/lxc/copy.go

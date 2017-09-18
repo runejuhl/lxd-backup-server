@@ -17,11 +17,14 @@ import (
 	"github.com/lxc/lxd/shared/version"
 
 	"github.com/sirupsen/logrus"
+
+	versioncmp "github.com/mcuadros/go-version"
 )
 
 type Client struct {
-	conf *config.Config
-	d    lxd.ContainerServer
+	conf    *config.Config
+	d       lxd.ContainerServer
+	version string
 }
 
 func loadConfig() *config.Config {
@@ -77,9 +80,18 @@ func getServer(conf *config.Config) lxd.ContainerServer {
 
 func InitClient() Client {
 	config := loadConfig()
+
+	server := getServer(config)
+	serverEnv, _, err := server.GetServer()
+
+	if err != nil {
+		log.WithError(err).Fatal("could not read server environment")
+	}
+
 	return Client{
-		conf: config,
-		d:    getServer(config),
+		conf:    config,
+		d:       server,
+		version: serverEnv.Environment.ServerVersion,
 	}
 
 }
@@ -98,6 +110,25 @@ func (c Client) GetContainers() map[string]api.Container {
 	}
 
 	return cts
+}
+
+func (c Client) GetContainerCopyArgs() lxd.ContainerCopyArgs {
+
+	args := lxd.ContainerCopyArgs{
+		// Default value as of lxc 2.17 is "pull" -- we'll use that
+		Mode: "pull",
+		// Don't copy stateful; no need to dump memory
+		Live: false,
+	}
+
+	// We don't want to copy any snapshots, just the running
+	// instance.
+	//
+	// `ContainerOnly` is only supported from LXD 2.17:
+	// https://github.com/lxc/lxd/commit/b24663294ff2a4492a7858f89745581c0e418cde
+	args.ContainerOnly = versioncmp.CompareSimple(c.version, "2.17") >= 0
+
+	return args
 }
 
 // Taken from
