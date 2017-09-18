@@ -77,6 +77,13 @@ func (cmd BackupCommand) Error(err error, message string) {
 
 func (cmd *BackupCommand) Handle(req Request) {
 	cts := client.GetContainers()
+
+	if cmd.Name == "" {
+		cmd.log.Debug("request given but no name present")
+		req.w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	ct, ok := cts[cmd.Name]
 
 	if !ok {
