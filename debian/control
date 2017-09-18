@@ -3,10 +3,10 @@ Priority: optional
 Maintainer: Rune Juhl Jacobsen <runejuhl@enableit.dk>
 Section: misc
 Homepage: https://obmondo.com
-Build-Depends: debhelper (>= 9), devscripts (>= 2.16)
+Build-Depends: debhelper (>= 9), dh-systemd (>= 1.5), golang-1.8-go (>= 1.8), devscripts (>= 2.16)
 Standards-Version: 3.9.8
 
 Package: obmondo-lxd-backup-server
-Architecture: all
-Depends: lxd (>= 2.0)
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, lxd (>= 2.0)
 Description: Backup server for safe backups of LXCs
