@@ -7,7 +7,7 @@ BindsTo=lxd.service
 Type=simple
 EnvironmentFile=-/etc/default/lxd-backup-server
 ExecStart=/opt/obmondo/bin/lxd-backup-server
-User=lxd
+User=root
 Restart=always
 RestartSec=10
 
