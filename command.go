@@ -211,6 +211,7 @@ func (cmd BackupCommand) process() {
 	stdin = os.Stdin
 	stdin = ioutil.NopCloser(bytes.NewReader(nil))
 
+	stderr := new(MemoryBuffer)
 	stdout := new(MemoryBuffer)
 
 	// Run the associated command in the container copy
@@ -227,7 +228,7 @@ func (cmd BackupCommand) process() {
 		Stdin:  stdin,
 		Stdout: stdout,
 		// FIXME: Should we use a new io.ReadCloser here?
-		Stderr: os.Stderr,
+		Stderr: stderr,
 		// Since we're not interactive we don't need a handler
 		Control:  nil,
 		DataDone: make(chan bool),
@@ -258,7 +259,8 @@ func (cmd BackupCommand) process() {
 	<-execArgs.DataDone
 
 	cmd.log.WithFields(logrus.Fields{
-		"bufsize": stdout.Len(),
+		"stdout_bytes": stdout.Len(),
+		"stderr":       stderr.String(),
 	}).Debug("exec operation finished")
 
 	cmd.log.Debug("copying files")
