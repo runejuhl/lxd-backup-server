@@ -1,14 +1,13 @@
 [Unit]
-Description=Packagesign Server
+Description=LXD backup server
 After=network.target
-Before=network.target
-Wants=packagesign.service
+BindsTo=lxd.service
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/default/packagesign-server
-ExecStart=/usr/bin/packagesign-server
-User=packagesign
+EnvironmentFile=-/etc/default/lxd-backup-server
+ExecStart=/opt/obmondo/bin/lxd-backup-server
+User=lxd
 Restart=always
 RestartSec=10
 
