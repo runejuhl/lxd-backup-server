@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func genID() string {
@@ -86,11 +84,11 @@ func (ps PersistentOperations) Delete(id string) {
 	cmd, ok := ps.cmds[id]
 
 	if !ok {
-		log.Error("tried to delete non-existant op")
+		cmd.log.Error("tried to delete non-existant op")
 		return
 	}
 
-	delete(ps.cmds, id)
+	defer delete(ps.cmds, id)
 
 	cmd.log.Debug("deleted persistent operation")
 

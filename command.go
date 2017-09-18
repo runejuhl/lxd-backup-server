@@ -12,7 +12,7 @@ import (
 
 	lxd "github.com/lxc/lxd/client"
 	"github.com/lxc/lxd/shared/api"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // BackupCommand Request body when requesting a snapshot of a container.
@@ -34,7 +34,7 @@ type BackupCommand struct {
 
 	id        string
 	timestamp time.Time
-	log       *log.Entry
+	log       *logrus.Entry
 
 	dstCt api.Container
 
@@ -87,7 +87,7 @@ func (cmd *BackupCommand) Handle(req Request) {
 	cmd.dstCt = ct
 	// Generate a unique and timestamped name for our copy
 	cmd.destName = fmt.Sprintf("%s-backup-%s", cmd.Name, cmd.id)
-	cmd.log = req.log.WithFields(log.Fields{
+	cmd.log = req.log.WithFields(logrus.Fields{
 		"container": ct.Name,
 		"copy":      cmd.destName})
 
@@ -257,7 +257,7 @@ func (cmd BackupCommand) process() {
 	// Wait for any remaining I/O to be flushed
 	<-execArgs.DataDone
 
-	cmd.log.WithFields(log.Fields{
+	cmd.log.WithFields(logrus.Fields{
 		"bufsize": stdout.Len(),
 	}).Debug("exec operation finished")
 
@@ -272,14 +272,14 @@ func (cmd BackupCommand) process() {
 		}
 
 		if filename[0] != '/' {
-			log.Error("invalid filename")
+			cmd.log.Error("invalid filename")
 			continue
 		}
 
 		sources = append(sources, filename)
 	}
 
-	log.Debug("copying...")
+	cmd.log.Debug("copying...")
 
 	err = LXCPullFile(cmd.log, &cmd.dstCt, cmd.destName, sources, fileDest)
 	if err != nil {

@@ -9,7 +9,8 @@ import (
 	"os"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"github.com/ssgreg/journalhook"
 )
 
 var (
@@ -20,6 +21,9 @@ var (
 	persistedOperations = NewPersistentOperations()
 
 	fileDest string
+
+	// global logger
+	log *logrus.Logger
 )
 
 // Exit codes
@@ -42,13 +46,18 @@ type Request struct {
 	ID  string
 	w   http.ResponseWriter
 	r   *http.Request
-	log *log.Entry
+	log *logrus.Entry
 }
 
 func main() {
 
-	log.SetLevel(log.DebugLevel)
-	// cts := client.GetContainers()
+	log = logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	hook, err := journalhook.NewJournalHook()
+	if err == nil {
+		log.Hooks.Add(hook)
+	}
 
 	fileDest = os.Getenv("FILE_DESTINATION")
 	if fileDest == "" {
@@ -74,7 +83,7 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 		ID: reqID,
 		w:  hw,
 		r:  hr,
-		log: log.WithFields(log.Fields{
+		log: log.WithFields(logrus.Fields{
 			"reqID":  reqID,
 			"url":    hr.URL.Path,
 			"method": hr.Method,
@@ -148,7 +157,7 @@ func getBodyFromReq(w http.ResponseWriter, r io.ReadCloser) (bytes.Buffer, error
 	b, err := rawBody.ReadFrom(r)
 
 	if err != nil {
-		log.WithFields(log.Fields{
+		log.WithFields(logrus.Fields{
 			"bytes": b,
 		}).WithError(err).Warning()
 		w.WriteHeader(http.StatusBadRequest)
