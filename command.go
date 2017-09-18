@@ -289,6 +289,9 @@ func (cmd BackupCommand) process() {
 		return
 	}
 
+	cmd.log.Info("operation completed")
+
+	// signal completion
 	cmd.Error(nil, "")
 
 	return
