@@ -65,3 +65,7 @@ running, but their status hasn't been read yet.
   curl -i localhost:3000/backup/list
   curl -i -H 'Request-Id: 679078d84ae43521' localhost:3000/backup
 #+END_SRC
+
+** Future improvement
+If the command only outputs to one file, it would be trivial to just output it
+to stderr and avoid a file copy.
