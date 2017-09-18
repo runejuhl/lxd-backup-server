@@ -87,6 +87,7 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 			"reqID":  reqID,
 			"url":    hr.URL.Path,
 			"method": hr.Method,
+			"ip":     hr.RemoteAddr,
 		}),
 	}
 
@@ -125,7 +126,9 @@ func handleRequest(hw http.ResponseWriter, hr *http.Request) {
 			err = json.Unmarshal(body.Bytes(), &cmd)
 
 			if err != nil {
+				req.log.WithError(err).Error()
 				req.w.WriteHeader(http.StatusInternalServerError)
+				req.w.Write([]byte(fmt.Sprintf("%s\n", err.Error())))
 				return
 			}
 
