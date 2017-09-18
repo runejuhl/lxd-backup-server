@@ -62,7 +62,7 @@ func main() {
 
 	http.HandleFunc("/", handleRequest)
 
-	log.Debugf("starting server on port :%s", port)
+	log.Infof("starting server on port :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 }
