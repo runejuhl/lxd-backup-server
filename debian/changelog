@@ -1,3 +1,20 @@
+obmondo-lxd-backup-server (0.2.0) unstable; urgency=medium
+
+  * Log startup as info
+  * Fix service unit
+  * Fix dependencies and control file
+  * Exclude any dotfiles from build
+  * Log directly to journald
+  * Run as root to allow access to lxd socket
+  * Log remote addr, add error handling for invalid JSON
+  * Handle command with missing name
+  * Properly handle older LXD versions
+  * Capture stderr from exec
+  * Signal completion in logs
+  * Add idea for future improvement
+
+ -- Rune Juhl Jacobsen <runejuhl@enableit.dk>  Mon, 18 Sep 2017 23:58:13 +0200
+
 obmondo-lxd-backup-server (0.1.2) unstable; urgency=medium
 
   * Remove stale comment
