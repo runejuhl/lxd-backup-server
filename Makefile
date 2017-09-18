@@ -9,7 +9,7 @@ GIT_EMAIL:=$(shell sed -r 's/^ *?([^ ]+)/\1/' <<< "${EMAIL} $(shell git config u
 
 VERSION = $(shell git describe --tags | tail -c +2)
 export GOPATH := $(GOPATH):$(shell pwd)/tmp/
-SOURCES = $(shell find . -name '*.go' -not -path './vendor/*' -not -path './deps/*')
+SOURCES = $(shell find . -name '*.go' -not -name '.*' -not -path './vendor/*' -not -path './deps/*')
 EXEC_FILE = $(PROJECT)
 # statically link and strip binaries
 LDFLAGS = '-s'
