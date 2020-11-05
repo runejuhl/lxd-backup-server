@@ -147,8 +147,9 @@ type FileCmd struct {
 // https://github.com/lxc/lxd/blob/b5678b80f32d2de619c88009a518bbdfca21d9d8/lxc/file.go
 func LXCPullFile(log *logrus.Entry, ct *api.Container, remote string, sources []string, target string) (err error) {
 	log = log.WithFields(logrus.Fields{
-		"remote": remote,
-		"target": target,
+		"remote":  remote,
+		"sources": sources,
+		"target":  target,
 	})
 
 	if len(sources) == 0 || target == "" {
