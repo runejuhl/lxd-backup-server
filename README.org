@@ -1,4 +1,15 @@
 * LXD backup server
+LXD utility for using LXC snapshots to create consistent backups from running
+containers.
+
+** Note
+This was written in 2017. The LXD API has changed quite a bit since then and I'm
+not sure if this code will even compile anymore.
+
+In any case: the idea was good enough (and the tool worked fine enough) that it
+should be publicly available – so here it is.
+
+~/runejuhl~
 
 ** Design
 This program implements a small HTTP server with the intention of providing a
@@ -8,6 +19,23 @@ While LXD does have a REST API that can be used (and is indeed used here as
 well, though the Golang lxd library) it doesn't have any support for
 authentication or access control so any client able to connect can do anything
 to other containers.
+
+The idea is that this tool is used to backup a stateful process running in an
+LXC container.
+
+*** Usage example
+Consider a MySQL database. To ensure consistency of a database dump it needs to
+be locked while the database is written out to disk. Since writing the file out
+can take a while this is often not a good way to go about it.
+
+With LXD we can take a snapshot of a running container, and any changes to the
+copy will not affect the parent container.
+
+This means that instead of pausing a production system for however long enough
+to create a backup, we can instead issue a lock to the production system, create
+an LXD snapshot, unpause the production system and then use the cloned container
+to create our backup. After the backup completes the backup is written back into
+the production container and the clone is destroyed.
 
 *** Endpoints
 
